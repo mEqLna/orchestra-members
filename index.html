@@ -1,0 +1,720 @@
+<!-- CodePen: HTMLパネルにこのファイルの中身をそのまま貼り付けてください（CSS/JSも含んでいます） -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>演奏メンバー参加登録</title>
+<style>
+  :root { --bg:#f6f4ef; --card:#fff; --ink:#222; --sub:#666; --accent:#2b5d8a; --line:#e2ded4; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; background:var(--bg); color:var(--ink); line-height:1.6; }
+  .wrap { max-width:960px; margin:0 auto; padding:16px; }
+  h1 { font-size:1.4rem; margin:8px 0 16px; }
+  h2 { font-size:1.1rem; margin:0 0 12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  label.f { display:block; font-weight:600; margin-bottom:4px; }
+  input[type=text], select { width:100%; padding:10px; font-size:1rem; border:1px solid #bbb; border-radius:6px; background:#fff; }
+  .row { margin-bottom:14px; }
+  .songs { display:grid; gap:6px; }
+  .songrow { border:1px solid var(--line); border-radius:6px; }
+  .songrow:has(input:checked) { background:#e8f0f7; border-color:var(--accent); }
+  .songs label { display:flex; gap:8px; align-items:flex-start; padding:8px 10px; cursor:pointer; }
+  .si-wrap { display:flex; gap:8px; align-items:center; padding:0 10px 8px 32px; flex-wrap:wrap; }
+  .si-wrap select { flex:1 1 220px; width:auto; padding:6px 8px; font-size:.9rem; }
+  .songs input { margin-top:5px; }
+  button { font-size:1rem; padding:10px 18px; border:0; border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; }
+  button.sub { background:#eee; color:#333; border:1px solid #ccc; }
+  button.del { background:transparent; color:#b33; padding:2px 8px; border:1px solid #d99; font-size:.85rem; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .msg { color:#b33; min-height:1.4em; margin:6px 0 0; font-size:.9rem; }
+  .ok { color:#287a3e; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:.9rem; }
+  th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  th { background:#f0ede4; white-space:nowrap; }
+  td.n, th.n { text-align:center; }
+  td.zero { color:#bbb; }
+  .total { font-weight:700; background:#faf8f2; }
+  tr.grp td { font-weight:700; background:#f7f5ee; }
+  tr.kid td { font-size:.85rem; color:#444; }
+  tr.kid td:first-child { padding-left:28px; }
+  tr.kid td:first-child::before { content:"└ "; color:#aaa; }
+  .note { color:var(--sub); font-size:.85rem; }
+  .tag { display:inline-block; background:#eef; border-radius:4px; padding:0 6px; margin:1px 2px 1px 0; font-size:.8rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>演奏メンバー参加登録</h1>
+
+  <div class="card">
+    <h2>登録フォーム</h2>
+    <div class="row">
+      <label class="f" for="name">お名前</label>
+      <input type="text" id="name" placeholder="例：秋山 紀夫" autocomplete="off">
+    </div>
+    <div class="row">
+      <label class="f" for="inst">楽器</label>
+      <select id="inst"></select>
+      <div id="otherRow" style="display:none; margin-top:8px">
+        <input type="text" id="otherInst" maxlength="30" placeholder="追加する楽器名（例：ビオラ、ハープ、ピアノ）" autocomplete="off">
+        <label class="f" for="otherGrp" style="margin-top:10px">どの楽器のグループに入れますか</label>
+        <select id="otherGrp"></select>
+        <input type="text" id="newGrp" maxlength="20" placeholder="新しいグループ名（例：弦楽器）" autocomplete="off" style="display:none; margin-top:8px">
+        <p class="note" style="margin:4px 0 0">例：ソプラニーノサックスなら「サックス」、ビオラなら新しく「弦楽器」を作る。追加した楽器とグループは、ほかの人の選択肢にも表示されます。</p>
+      </div>
+    </div>
+    <div class="row">
+      <label class="f">参加曲と担当楽器（複数選択可）</label>
+      <div class="songs" id="songs"></div>
+      <p class="note" style="margin:6px 0 0">曲ごとに持ち替える場合は、その曲の担当楽器を選んでください。</p>
+    </div>
+    <div class="actions">
+      <button id="save">登録する</button>
+      <button class="sub" id="clear">入力をクリア</button>
+    </div>
+    <p class="msg" id="msg"></p>
+    <p class="note">修正したいとき：下の登録者一覧で自分の「編集」を押すか、同じ名前を入力すると登録内容が読み込まれます。変更して「内容を更新する」を押してください。</p>
+  </div>
+
+  <div class="card">
+    <h2>曲ごとの参加人数</h2>
+    <div class="scroll" id="songTable"></div>
+  </div>
+
+  <div class="card">
+    <h2>グループごとの合計人数</h2>
+    <div class="scroll" id="grpTable"></div>
+  </div>
+
+  <div class="card">
+    <h2>楽器ごとの人数（主な楽器）</h2>
+    <div class="scroll" id="instTable"></div>
+  </div>
+
+  <div class="card">
+    <h2>曲 × 楽器 内訳（曲ごとの担当楽器）</h2>
+    <div class="scroll" id="matrix"></div>
+  </div>
+
+  <div class="card">
+    <h2>楽器のグループを組み替える</h2>
+    <p class="note" style="margin-top:0">標準の楽器も、追加された楽器も、別のグループに移せます。変更は全員の画面に反映されます。</p>
+    <div class="row">
+      <label class="f" for="mvInst">楽器</label>
+      <select id="mvInst"></select>
+    </div>
+    <div class="row">
+      <label class="f" for="mvGrp">移動先のグループ</label>
+      <select id="mvGrp"></select>
+      <input type="text" id="mvNew" maxlength="20" placeholder="新しいグループ名（例：金管楽器）" autocomplete="off" style="display:none; margin-top:8px">
+    </div>
+    <div class="actions"><button id="mvBtn">グループを変更する</button></div>
+    <p class="msg" id="mvMsg"></p>
+    <div id="mvList"></div>
+  </div>
+
+  <div class="card">
+    <h2>表示順を変える</h2>
+    <p class="note" style="margin-top:0">グループと楽器の並び順を、↑↓で入れ替えられます。変更は全員の画面に反映されます。</p>
+    <label class="f">グループの順番</label>
+    <div id="ordGroups"></div>
+    <label class="f" for="ordGrp" style="margin-top:14px">楽器の順番（グループを選ぶ）</label>
+    <select id="ordGrp"></select>
+    <div id="ordInsts"></div>
+    <p class="msg" id="ordMsg"></p>
+  </div>
+
+  <div class="card">
+    <h2>楽器名・グループ名を変更する</h2>
+    <p class="note" style="margin-top:0">表示される名前だけを変えます。登録済みのデータは変わりません。変更は全員の画面に反映されます。</p>
+    <div class="row">
+      <label class="f" for="rnKind">変更するもの</label>
+      <select id="rnKind"><option value="i">楽器の名前</option><option value="g">グループの名前</option></select>
+    </div>
+    <div class="row">
+      <label class="f" for="rnTarget">対象</label>
+      <select id="rnTarget"></select>
+    </div>
+    <div class="row">
+      <label class="f" for="rnNew">新しい名前</label>
+      <input type="text" id="rnNew" maxlength="40" autocomplete="off">
+    </div>
+    <div class="actions"><button id="rnBtn">名前を変更する</button></div>
+    <p class="msg" id="rnMsg"></p>
+    <div id="rnList"></div>
+  </div>
+
+  <div class="card">
+    <h2>登録者一覧（<span id="count">0</span>名）</h2>
+    <div class="scroll" id="members"></div>
+    <div class="actions" style="margin-top:12px">
+      <button class="sub" id="csv">CSVで保存</button>
+      <button class="sub" id="reset">全データを削除</button>
+    </div>
+    <p class="note">登録内容はGoogleスプレッドシートに保存され、全員の登録がこの画面に集計されます。</p>
+  </div>
+</div>
+
+<script>
+// ===== 設定：曲と楽器 =====
+const SONGS = [
+  { id:"M1", title:"A. リード：セカンド・センチュリー" },
+  { id:"M2", title:"A. リード：アルメニアン・ダンス パートI" },
+  { id:"M3", title:"A. リード：バラード ～アルト・サクソフォーンとバンドのための～" },
+  { id:"M4", title:"A. リード：エル・カミーノ・レアル ～ラテン・ファンタジー～" },
+  { id:"M5", title:"K. J. アルフォード：行進曲「ボギー大佐」" },
+  { id:"M6", title:"J. F. ワーグナー：行進曲「双頭の鷲の旗の下に」" },
+  { id:"M7", title:"小山清茂：吹奏楽のための木挽歌" },
+  { id:"M8", title:"ジャパニーズ・グラフィティII ～坂本九メモリアル～" },
+  { id:"M9", title:"ジブリ名曲集" }
+  // M10は未定のため省略。決まったら { id:"M10", title:"曲名" } を追加してください。
+];
+const INSTRUMENTS = [
+  "ピッコロ（Piccolo）","フルート（Flute）","オーボエ（Oboe）","ファゴット（Bassoon）",
+  "E♭クラリネット（E♭ Clarinet）","B♭クラリネット（B♭ Clarinet）","アルトクラリネット（Alto Clarinet）",
+  "バスクラリネット（Bass Clarinet）","ソプラノサクソフォン（Soprano Saxophone）","アルトサクソフォン（Alto Saxophone）",
+  "テナーサクソフォン（Tenor Saxophone）","バリトンサクソフォン（Baritone Saxophone）","トランペット（Trumpet）",
+  "コルネット（Cornet）","ホルン（Horn in F / E♭）","トロンボーン（Trombone）","バストロンボーン（Bass Trombone）",
+  "ユーフォニアム（Euphonium）","チューバ（Tuba）","打楽器（Percussion）","コントラバス（Contrabass / String Bass）"
+];
+// 階層表示のグループ（items は INSTRUMENTS の番号。1つだけのものは単独表示）
+const GROUPS = [
+  { name:"フルート系",     items:[0,1] },        // ピッコロ・フルート
+  { name:"ダブルリード",   items:[2,3] },        // オーボエ・ファゴット
+  { name:"クラリネット",   items:[4,5,6,7] },    // E♭・B♭・アルト・バス
+  { name:"サックス",       items:[8,9,10,11] },  // ソプラノ・アルト・テナー・バリトン
+  { name:"トランペット系", items:[12,13] },      // トランペット・コルネット
+  { name:"ホルン",         items:[14] },
+  { name:"トロンボーン系", items:[15,16] },      // トロンボーン・バストロンボーン
+  { name:"ユーフォニアム", items:[17] },
+  { name:"チューバ",       items:[18] },
+  { name:"打楽器",         items:[19] },
+  { name:"コントラバス",   items:[20] }
+];
+// Apps Script のウェブアプリURL（…/exec）をここに貼り付けます。
+// 空のままだと、このブラウザ内だけに保存するお試しモードで動きます。
+const API_URL = "https://script.google.com/macros/s/AKfycbyX8X-r6zzZz9zajRTqVbgt-G6ll5e5VBJa42nWpxDQAcP9_TFs4ua2BReqlkfb8aWE/exec";
+const KEY = "orchestra_members_v3";
+
+// ===== データの読み書き（スプレッドシート or ブラウザ内） =====
+let members = [];
+let overrides = {};   // 組み替えた楽器 → グループ名（全員で共有）
+let order = { groups:[], insts:[] };   // 表示順（全員で共有）
+let aliases = { insts:{}, groups:{} };   // 名前の変更（元の名前 → 表示名。全員で共有）
+const KEY_G = "orchestra_groups_v1";
+const KEY_O = "orchestra_order_v1";
+const KEY_A = "orchestra_aliases_v1";
+function loadLocal(){ try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){ return []; } }
+function loadLocalO(){ try { return JSON.parse(localStorage.getItem(KEY_O)) || { groups:[], insts:[] }; } catch(e){ return { groups:[], insts:[] }; } }
+function loadLocalA(){ try { return JSON.parse(localStorage.getItem(KEY_A)) || { insts:{}, groups:{} }; } catch(e){ return { insts:{}, groups:{} }; } }
+function loadLocalG(){ try { return JSON.parse(localStorage.getItem(KEY_G)) || {}; } catch(e){ return {}; } }
+function storeLocal(){
+  try { localStorage.setItem(KEY, JSON.stringify(members)); localStorage.setItem(KEY_G, JSON.stringify(overrides)); localStorage.setItem(KEY_O, JSON.stringify(order)); localStorage.setItem(KEY_A, JSON.stringify(aliases)); } catch(e){}
+}
+function applyState(st){
+  members = st.members || []; overrides = st.groups || {};
+  const o = st.order || {};
+  order = { groups:Array.isArray(o.groups) ? o.groups : [], insts:Array.isArray(o.insts) ? o.insts : [] };
+  const a = st.aliases || {};
+  aliases = { insts:a.insts || {}, groups:a.groups || {} };
+}
+const localState = () => ({ members, groups:overrides, order, aliases });
+
+async function callApi(body){
+  const opt = body ? { method:"POST", body:JSON.stringify(body) } : {};
+  const res = await fetch(API_URL, opt);
+  const j = await res.json();
+  if(!j.ok) throw new Error(j.error || "保存に失敗しました");
+  return { members:j.members, groups:j.groups, order:j.order, aliases:j.aliases };
+}
+async function apiList(){
+  if(!API_URL) return { members:loadLocal(), groups:loadLocalG(), order:loadLocalO(), aliases:loadLocalA() };
+  return callApi(null);
+}
+async function apiSave(rec){
+  if(!API_URL){
+    const i = members.findIndex(m=>m.name===rec.name);
+    if(i>=0) members[i]=rec; else members.push(rec);
+    storeLocal(); return localState();
+  }
+  return callApi({ action:"save", member:rec });
+}
+async function apiDelete(name){
+  if(!API_URL){ members = members.filter(m=>m.name!==name); storeLocal(); return localState(); }
+  return callApi({ action:"delete", name });
+}
+async function apiSetAlias(kind, key, name){   // kind: "inst" または "group"。name が空なら元の名前に戻す
+  if(!API_URL){
+    const t = kind==="group" ? "groups" : "insts";
+    if(name) aliases[t][key] = name; else delete aliases[t][key];
+    storeLocal(); return localState();
+  }
+  return callApi({ action:"setAlias", kind, key, name });
+}
+async function apiSetOrder(kind, list){   // kind: "groups" または "insts"
+  if(!API_URL){ order[kind] = list; storeLocal(); return localState(); }
+  return callApi({ action:"setOrder", kind, list });
+}
+async function apiSetGroup(inst, grp){   // grp が空なら組み替えを解除
+  if(!API_URL){
+    if(grp) overrides[inst] = grp; else delete overrides[inst];
+    storeLocal(); return localState();
+  }
+  return callApi({ action:"setGroup", inst, grp });
+}
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shortInst = s => s.replace(/（.*$/, "");
+// 表示名（名前を変更していればそちら、なければ元の名前）
+const dispInst = n => aliases.insts[n] || n;
+const dispShort = n => aliases.insts[n] || shortInst(n);
+const dispGrp = g => aliases.groups[g] || g;
+
+// ===== フォーム生成 =====
+// ===== 楽器の選択肢（標準の一覧＋各自が追加した楽器） =====
+const OTHER = "__other__";
+const OTHER_GROUP = "その他の楽器";
+const STD = new Set(INSTRUMENTS);
+const GROUP_NAMES = GROUPS.map(g=>g.name);
+const NEWGRP = "__newgrp__";
+const validGrp = g => typeof g==="string" && g.trim()!=="";
+// 追加された楽器 → 入れるグループ。同じ楽器は、最初に登録した人が選んだグループに統一する
+function customMap(){
+  const map = {};
+  members.forEach(m=>{
+    if(!STD.has(m.inst) && !(m.inst in map)) map[m.inst] = validGrp(m.grp) ? m.grp : OTHER_GROUP;
+  });
+  // 曲ごとの担当楽器にだけ出てくる楽器も、一覧から消えないように拾う
+  members.forEach(m=>Object.values(m.songInst || {}).forEach(n=>{
+    if(n && !STD.has(n) && !(n in map)) map[n] = OTHER_GROUP;
+  }));
+  return map;
+}
+const sortJa = arr => arr.sort((a,b)=>a.localeCompare(b,"ja"));
+const customNames = () => sortJa(Object.keys(customMap()));
+const normInst = s => String(s).trim().replace(/\s+/g," ");
+// その曲で担当する楽器（指定がなければ主な楽器）
+const instOf = (m, id) => (m.songInst && m.songInst[id]) || m.inst;
+// 入力が標準の楽器名（「フルート」など）や、すでに追加済みの楽器と同じなら、その名前にそろえる
+function matchKnown(raw){
+  const low = raw.toLowerCase();
+  return allInstruments().find(n => [n, shortInst(n), dispInst(n), dispShort(n)].some(x => x.toLowerCase()===low)) || null;
+}
+const stdGroupOf = {};
+GROUPS.forEach(g => g.items.forEach(i => { stdGroupOf[INSTRUMENTS[i]] = g.name; }));
+// 組み替え前のグループ（標準の楽器は標準の区分、追加した楽器は登録時に選んだグループ）
+const baseGroup = n => STD.has(n) ? stdGroupOf[n] : (customMap()[n] || OTHER_GROUP);
+// 現在のグループ（組み替えを反映）
+const groupOf = n => overrides[n] || baseGroup(n);
+// 保存された順番を優先し、載っていないものは標準の順で後ろに並べる
+const applyOrder = (base, saved) => {
+  const have = new Set(base);
+  const listed = [...new Set(saved)].filter(n => have.has(n));
+  const ls = new Set(listed);
+  return listed.concat(base.filter(n => !ls.has(n)));
+};
+const allInstruments = () => applyOrder(INSTRUMENTS.concat(customNames()), order.insts);
+// 利用者が新しく作ったグループ（標準のグループ・「その他の楽器」以外）
+const createdGroups = () => sortJa([...new Set(allInstruments().map(groupOf))]
+  .filter(g => !GROUP_NAMES.includes(g) && g!==OTHER_GROUP));
+const allGroupNames = () => applyOrder(GROUP_NAMES.concat(createdGroups(), [OTHER_GROUP]), order.groups);
+// 入力したグループ名が既存のグループと同じなら、その名前にそろえる
+const matchGroup = raw => allGroupNames().find(n => [n, dispGrp(n)].some(x => x.toLowerCase()===raw.toLowerCase())) || null;
+
+function buildGrpSelect(){
+  const sel = $("otherGrp"), cur = sel.value || OTHER_GROUP;
+  sel.innerHTML = allGroupNames().map(n=>`<option value="${esc(n)}">${esc(dispGrp(n))}</option>`).join("") +
+    `<option value="${NEWGRP}">＋ 新しいグループを作る</option>`;
+  sel.value = cur;
+  if(sel.value !== cur) sel.value = OTHER_GROUP;
+}
+$("otherGrp").addEventListener("change", () => toggleOther());
+
+function buildInstSelect(){
+  const sel = $("inst"), cur = sel.value;
+  const optn = n => `<option value="${esc(n)}">${esc(dispInst(n))}</option>`;
+  const map = customMap();
+  const cust = customNames();
+  sel.innerHTML = '<option value="">選択してください</option>' +
+    GROUPS.map(g => {
+      const names = g.items.map(i=>INSTRUMENTS[i]);
+      return names.length===1 ? optn(names[0])
+        : `<optgroup label="${esc(dispGrp(g.name))}">${names.map(optn).join("")}</optgroup>`;
+    }).join("") +
+    (cust.length ? `<optgroup label="追加された楽器">${cust.map(n=>
+        `<option value="${esc(n)}">${esc(dispInst(n))}（${esc(dispGrp(groupOf(n)))}）</option>`).join("")}</optgroup>` : "") +
+    `<option value="${OTHER}">＋ 一覧にない楽器を追加する</option>`;
+  sel.value = cur;
+  if(sel.value !== cur) sel.value = "";
+  buildGrpSelect();
+  toggleOther();
+}
+function toggleOther(){
+  const open = $("inst").value===OTHER;
+  $("otherRow").style.display = open ? "block" : "none";
+  $("newGrp").style.display = (open && $("otherGrp").value===NEWGRP) ? "block" : "none";
+}
+$("inst").addEventListener("change", toggleOther);
+
+// 階層表の行を作る（親＝グループ合計、子＝各楽器）
+// cellsFn には楽器名の配列が渡される。各楽器は「現在のグループ」（組み替え後）の下に並べる
+function hierRows(cellsFn, nameFn){
+  const insts = allInstruments();
+  return allGroupNames().map(gn=>{
+    const items = insts.filter(n=>groupOf(n)===gn);
+    if(!items.length) return "";
+    const gi = GROUPS.findIndex(g=>g.name===gn);
+    const flat = gi>=0 && GROUPS[gi].items.length===1 && items.length===1
+              && items[0]===INSTRUMENTS[GROUPS[gi].items[0]];
+    if(flat) return `<tr><td>${esc(nameFn(items[0]))}</td>${cellsFn(items)}</tr>`;
+    const parent = `<tr class="grp"><td>${esc(dispGrp(gn))}</td>${cellsFn(items)}</tr>`;
+    const kids = items.map(n=>`<tr class="kid"><td>${esc(nameFn(n))}</td>${cellsFn([n])}</tr>`).join("");
+    return parent + kids;
+  }).join("");
+}
+
+// ===== 楽器のグループを組み替える（全員で共有） =====
+function setMv(t, ok){ const m=$("mvMsg"); m.textContent=t; m.className="msg"+(ok?" ok":""); }
+function buildMoveUi(){
+  const selI = $("mvInst"), curI = selI.value;
+  selI.innerHTML = '<option value="">選択してください</option>' +
+    allInstruments().map(n=>`<option value="${esc(n)}">${esc(dispShort(n))}（${esc(dispGrp(groupOf(n)))}）</option>`).join("");
+  selI.value = curI; if(selI.value!==curI) selI.value = "";
+  const selG = $("mvGrp"), curG = selG.value;
+  selG.innerHTML = '<option value="">選択してください</option>' +
+    allGroupNames().map(n=>`<option value="${esc(n)}">${esc(dispGrp(n))}</option>`).join("") +
+    `<option value="${NEWGRP}">＋ 新しいグループを作る</option>`;
+  selG.value = curG; if(selG.value!==curG) selG.value = "";
+  $("mvNew").style.display = selG.value===NEWGRP ? "block" : "none";
+  const names = allInstruments();
+  const list = Object.keys(overrides).filter(n=>names.includes(n));
+  $("mvList").innerHTML = !list.length ? "" :
+    `<p class="note" style="margin:12px 0 4px">組み替え済みの楽器</p><table><tbody>` +
+    list.map(n=>`<tr><td>${esc(dispShort(n))}</td><td>${esc(dispGrp(baseGroup(n)))} → ${esc(dispGrp(overrides[n]))}</td>` +
+      `<td><button class="sub mvundo" data-n="${esc(n)}">元に戻す</button></td></tr>`).join("") +
+    `</tbody></table>`;
+}
+$("mvGrp").addEventListener("change", () => { $("mvNew").style.display = $("mvGrp").value===NEWGRP ? "block" : "none"; });
+async function moveGroup(inst, target, okMsg){
+  try {
+    // 元のグループと同じ指定なら、組み替えを解除する
+    applyState(await apiSetGroup(inst, target===baseGroup(inst) ? "" : target));
+    render(); setMv(okMsg, true);
+  } catch(e){ setMv("変更できませんでした：" + e.message); }
+}
+$("mvBtn").onclick = async () => {
+  const inst = $("mvInst").value;
+  let g = $("mvGrp").value;
+  if(!inst){ setMv("移したい楽器を選んでください。"); return; }
+  if(g===""){ setMv("移動先のグループを選んでください。"); return; }
+  if(g===NEWGRP){
+    const raw = normInst($("mvNew").value);
+    if(!raw){ setMv("新しいグループの名前を入力してください。"); return; }
+    if(raw.length>20){ setMv("グループ名は20文字以内で入力してください。"); return; }
+    g = matchGroup(raw) || raw;
+  }
+  if(groupOf(inst)===g){ setMv("すでにそのグループに入っています。"); return; }
+  await moveGroup(inst, g, `${dispShort(inst)} を「${dispGrp(g)}」に移しました。`);
+  $("mvNew").value = "";
+};
+// ===== 表示順を変える（全員で共有） =====
+const visibleGroups = () => allGroupNames().filter(g => allInstruments().some(n => groupOf(n)===g));
+const instsOfGroup = g => allInstruments().filter(n => groupOf(n)===g);
+function setOrd(t, ok){ const m=$("ordMsg"); m.textContent=t; m.className="msg"+(ok?" ok":""); }
+function orderRows(list, kind){
+  return list.map((n,i)=>`<tr><td>${esc(kind==="i" ? dispShort(n) : dispGrp(n))}</td><td style="white-space:nowrap;text-align:right">` +
+    `<button class="sub ordbtn" data-k="${kind}" data-n="${esc(n)}" data-d="-1" ${i===0?"disabled":""}>↑</button> ` +
+    `<button class="sub ordbtn" data-k="${kind}" data-n="${esc(n)}" data-d="1" ${i===list.length-1?"disabled":""}>↓</button></td></tr>`).join("");
+}
+function buildOrderUi(){
+  const vis = visibleGroups();
+  $("ordGroups").innerHTML = `<table><tbody>${orderRows(vis,"g")}</tbody></table>`;
+  const sel = $("ordGrp"), cur = sel.value;
+  sel.innerHTML = vis.map(g=>`<option value="${esc(g)}">${esc(dispGrp(g))}</option>`).join("");
+  sel.value = cur; if(sel.value!==cur) sel.value = vis[0] || "";
+  $("ordInsts").innerHTML = `<table><tbody>${orderRows(instsOfGroup(sel.value),"i")}</tbody></table>`;
+}
+$("ordGrp").addEventListener("change", buildOrderUi);
+async function reorder(kind, name, d){
+  const vis = kind==="g" ? visibleGroups() : instsOfGroup($("ordGrp").value);
+  const i = vis.indexOf(name), j = i + d;
+  if(i<0 || j<0 || j>=vis.length) return;
+  const full = (kind==="g" ? allGroupNames() : allInstruments()).slice();
+  const a = full.indexOf(vis[i]), b = full.indexOf(vis[j]);
+  [full[a], full[b]] = [full[b], full[a]];
+  try {
+    applyState(await apiSetOrder(kind==="g" ? "groups" : "insts", full));
+    render(); setOrd("並び順を変更しました。", true);
+  } catch(e){ setOrd("変更できませんでした：" + e.message); }
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest(".ordbtn"); if(!b || b.disabled) return;
+  reorder(b.dataset.k, b.dataset.n, Number(b.dataset.d));
+});
+// ===== 名前を変更する（全員で共有。元の名前は変わらず、表示名だけが変わる） =====
+function setRn(t, ok){ const m=$("rnMsg"); m.textContent=t; m.className="msg"+(ok?" ok":""); }
+function buildRenameUi(){
+  const kind = $("rnKind").value, sel = $("rnTarget"), cur = sel.value;
+  const list = kind==="g" ? allGroupNames() : allInstruments();
+  sel.innerHTML = '<option value="">選択してください</option>' +
+    list.map(n=>`<option value="${esc(n)}">${esc(kind==="g" ? dispGrp(n) : dispInst(n))}</option>`).join("");
+  sel.value = cur; if(sel.value!==cur) sel.value = "";
+  $("rnNew").placeholder = kind==="g" ? "新しいグループ名（20文字以内）" : "新しい楽器名（40文字以内）";
+  const items = [];
+  allGroupNames().filter(k=>aliases.groups[k]).forEach(k=>items.push(["g",k,k,aliases.groups[k]]));
+  allInstruments().filter(k=>aliases.insts[k]).forEach(k=>items.push(["i",k,shortInst(k),aliases.insts[k]]));
+  $("rnList").innerHTML = !items.length ? "" :
+    `<p class="note" style="margin:12px 0 4px">名前を変更済み</p><table><tbody>` +
+    items.map(([k,key,orig,disp])=>`<tr><td>${k==="g"?"グループ":"楽器"}</td><td>${esc(orig)} → ${esc(disp)}</td>` +
+      `<td><button class="sub rnundo" data-k="${k}" data-n="${esc(key)}">元の名前に戻す</button></td></tr>`).join("") +
+    `</tbody></table>`;
+}
+$("rnKind").addEventListener("change", buildRenameUi);
+async function setAlias(kind, key, name, okMsg){
+  try {
+    applyState(await apiSetAlias(kind==="g" ? "group" : "inst", key, name));
+    render(); setRn(okMsg, true);
+  } catch(e){ setRn("変更できませんでした：" + e.message); }
+}
+$("rnBtn").onclick = async () => {
+  const kind = $("rnKind").value, key = $("rnTarget").value, raw = normInst($("rnNew").value);
+  const max = kind==="g" ? 20 : 40;
+  if(!key){ setRn("名前を変えたい項目を選んでください。"); return; }
+  if(!raw){ setRn("新しい名前を入力してください。"); return; }
+  if(raw.length>max){ setRn(`${max}文字以内で入力してください。`); return; }
+  const low = raw.toLowerCase();
+  const clash = kind==="g"
+    ? allGroupNames().find(n => n!==key && [n, dispGrp(n)].some(x => x.toLowerCase()===low))
+    : allInstruments().find(n => n!==key && [n, shortInst(n), dispInst(n), dispShort(n)].some(x => x.toLowerCase()===low));
+  if(clash){ setRn(`「${raw}」は、ほかの${kind==="g"?"グループ":"楽器"}（${kind==="g" ? dispGrp(clash) : dispShort(clash)}）と同じ名前です。`); return; }
+  const before = kind==="g" ? dispGrp(key) : dispShort(key);
+  const reset = low===key.toLowerCase();   // 元の名前と同じなら、変更を解除する
+  await setAlias(kind, key, reset ? "" : raw, `「${before}」を「${raw}」に変更しました。`);
+  $("rnNew").value = "";
+};
+document.addEventListener("click", async e => {
+  const b = e.target.closest(".rnundo"); if(!b) return;
+  const k = b.dataset.k, n = b.dataset.n;
+  await setAlias(k, n, "", `「${k==="g" ? n : shortInst(n)}」を元の名前に戻しました。`);
+});
+$("mvList").addEventListener("click", async e => {
+  const b = e.target.closest(".mvundo"); if(!b) return;
+  const n = b.dataset.n;
+  await moveGroup(n, baseGroup(n), `${dispShort(n)} を元のグループ（${dispGrp(baseGroup(n))}）に戻しました。`);
+});
+// 曲ごとに「参加するか」と「担当楽器」を並べる（担当楽器は参加にチェックすると出る）
+function buildSongRows(){
+  const prev = {};
+  document.querySelectorAll("#songs .si").forEach(x=>{ prev[x.dataset.id] = x.value; });
+  const checked = new Set([...document.querySelectorAll("#songs input:checked")].map(c=>c.value));
+  const opts = allInstruments().map(n=>`<option value="${esc(n)}">${esc(dispShort(n))}</option>`).join("");
+  $("songs").innerHTML = SONGS.map(s =>
+    `<div class="songrow">` +
+      `<label><input type="checkbox" value="${s.id}"${checked.has(s.id)?" checked":""}>` +
+      `<span><b>${s.id}</b> ${esc(s.title)}</span></label>` +
+      `<div class="si-wrap" data-for="${s.id}"><span class="note">担当楽器</span>` +
+      `<select class="si" data-id="${s.id}"><option value="">主な楽器と同じ</option>${opts}</select></div>` +
+    `</div>`).join("");
+  document.querySelectorAll("#songs .si").forEach(x=>{
+    if(prev[x.dataset.id] !== undefined) x.value = prev[x.dataset.id];
+  });
+  syncSongRows();
+}
+function syncSongRows(){
+  document.querySelectorAll("#songs .songrow").forEach(row=>{
+    const c = row.querySelector("input[type=checkbox]");
+    row.querySelector(".si-wrap").style.display = c.checked ? "flex" : "none";
+  });
+}
+$("songs").addEventListener("change", e => { if(e.target.type==="checkbox") syncSongRows(); });
+
+function setMsg(t, ok){ const m=$("msg"); m.textContent=t; m.className="msg"+(ok?" ok":""); }
+function refreshBtn(){
+  const exists = members.some(m=>m.name===$("name").value.trim());
+  $("save").textContent = exists ? "内容を更新する" : "登録する";
+}
+function clearForm(){
+  $("name").value=""; $("inst").value=""; $("otherInst").value=""; $("otherGrp").value=OTHER_GROUP; $("newGrp").value="";
+  toggleOther();
+  document.querySelectorAll("#songs input[type=checkbox]").forEach(c=>c.checked=false);
+  document.querySelectorAll("#songs .si").forEach(x=>{ x.value=""; });
+  syncSongRows();
+  refreshBtn();
+}
+// 登録済みの人の内容をフォームに読み込む（修正用）
+function loadMember(m){
+  $("name").value = m.name;
+  buildInstSelect();
+  $("inst").value = m.inst;
+  $("otherInst").value = "";
+  toggleOther();
+  document.querySelectorAll("#songs input[type=checkbox]").forEach(c=>c.checked = m.songs.includes(c.value));
+  document.querySelectorAll("#songs .si").forEach(x=>{
+    const v = (m.songInst || {})[x.dataset.id] || "";
+    x.value = v; if(x.value !== v) x.value = "";
+  });
+  syncSongRows();
+  refreshBtn();
+  setMsg(`${m.name} さんの登録内容を読み込みました。修正して「内容を更新する」を押してください。`, true);
+  $("name").scrollIntoView({behavior:"smooth", block:"center"});
+}
+
+let busy = false;
+$("save").onclick = async () => {
+  if(busy) return;
+  const name = $("name").value.trim();
+  let inst = $("inst").value;
+  const songs = [...document.querySelectorAll("#songs input[type=checkbox]:checked")].map(c=>c.value);
+  if(!name){ setMsg("お名前を入力してください。"); return; }
+  if(inst===""){ setMsg("楽器を選んでください。"); return; }
+  let grp = "";
+  if(inst===OTHER){
+    const raw = normInst($("otherInst").value);
+    if(!raw){ setMsg("追加する楽器の名前を入力してください。"); return; }
+    if(raw.length>30){ setMsg("楽器名は30文字以内で入力してください。"); return; }
+    inst = matchKnown(raw) || raw;
+    grp = $("otherGrp").value;
+    if(grp===NEWGRP){
+      const gr = normInst($("newGrp").value);
+      if(!gr){ setMsg("新しいグループの名前を入力してください。"); return; }
+      if(gr.length>20){ setMsg("グループ名は20文字以内で入力してください。"); return; }
+      grp = matchGroup(gr) || gr;
+    }
+  }
+  if(!STD.has(inst)){
+    // すでに追加されている楽器なら、そのグループに合わせる
+    grp = customMap()[inst] || (validGrp(grp) ? grp : OTHER_GROUP);
+  } else {
+    grp = "";
+  }
+  if(!songs.length){ setMsg("参加曲を1曲以上選んでください。"); return; }
+  // 主な楽器と違う曲だけ、担当楽器を記録する
+  const songInst = {};
+  songs.forEach(id=>{
+    const sel = document.querySelector(`#songs .si[data-id="${id}"]`);
+    const v = sel ? sel.value : "";
+    if(v && v !== inst) songInst[id] = v;
+  });
+  const existed = members.some(m=>m.name===name);
+  busy = true; $("save").disabled = true; setMsg("保存しています…", true);
+  try {
+    applyState(await apiSave({ name, inst, songs, songInst, grp }));
+    render();
+    setMsg(existed ? `${name} さんの内容を更新しました。` : `${name} さんを登録しました。`, true);
+    clearForm();
+  } catch(e){
+    setMsg("保存できませんでした：" + e.message);
+  } finally {
+    busy = false; $("save").disabled = false;
+  }
+};
+$("clear").onclick = () => { clearForm(); setMsg(""); };
+
+// 名前を入力して既存者なら内容を復元
+$("name").addEventListener("input", refreshBtn);
+$("name").addEventListener("change", () => {
+  const m = members.find(x=>x.name===$("name").value.trim());
+  refreshBtn();
+  if(m) loadMember(m);
+});
+
+// ===== 集計と表示 =====
+function table(head, rows){
+  return `<table><thead><tr>${head.map((h,i)=>`<th class="${i>0?'n':''}">${h}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+function cell(v){ return `<td class="n ${v===0?'zero':''}">${v}</td>`; }
+
+function render(){
+  $("count").textContent = members.length;
+  buildInstSelect();
+  buildSongRows();
+  buildMoveUi();
+  buildOrderUi();
+  buildRenameUi();
+
+  // 曲ごと
+  let rows = SONGS.map(s=>{
+    const n = members.filter(m=>m.songs.includes(s.id)).length;
+    return `<tr><td><b>${s.id}</b> ${esc(s.title)}</td>${cell(n)}</tr>`;
+  }).join("");
+  $("songTable").innerHTML = table(["曲","参加人数"], rows);
+
+  // グループごとの合計（標準のグループ＋新しく作られたグループ＋その他の楽器）
+  const byGrp = {};
+  members.forEach(m => { const g = groupOf(m.inst); (byGrp[g] = byGrp[g] || []).push(m); });
+  rows = allGroupNames().filter(g => GROUP_NAMES.includes(g) || (byGrp[g]||[]).length).map(g => {
+    const ms = byGrp[g] || [];
+    const per = {};
+    ms.forEach(m => { per[m.inst] = (per[m.inst]||0) + 1; });
+    const detail = Object.keys(per).map(n => `${esc(dispShort(n))} ${per[n]}名`).join("、");
+    const isNew = !GROUP_NAMES.includes(g) && g!==OTHER_GROUP;
+    return `<tr class="${isNew?'grp':''}"><td>${esc(dispGrp(g))}${isNew?' <span class="tag">新規</span>':''}</td>${cell(ms.length)}` +
+           `<td style="font-size:.85rem;color:#555">${detail}</td></tr>`;
+  }).join("") + `<tr class="total"><td>合計</td><td class="n">${members.length}</td><td></td></tr>`;
+  $("grpTable").innerHTML = table(["グループ","人数","内訳"], rows);
+
+  // 楽器ごと
+  rows = hierRows(names => cell(members.filter(m=>names.includes(m.inst)).length), n=>dispInst(n)) +
+    `<tr class="total"><td>合計</td><td class="n">${members.length}</td></tr>`;
+  $("instTable").innerHTML = table(["楽器","人数"], rows);
+
+  // 曲×楽器
+  const head = ["楽器", ...SONGS.map(s=>s.id)];
+  rows = hierRows(
+    names => SONGS.map(s=>cell(members.filter(m=>m.songs.includes(s.id) && names.includes(instOf(m,s.id))).length)).join(""),
+    n => dispShort(n)
+  ) +
+  `<tr class="total"><td>合計</td>${SONGS.map(s=>`<td class="n">${members.filter(m=>m.songs.includes(s.id)).length}</td>`).join("")}</tr>`;
+  $("matrix").innerHTML = table(head, rows);
+
+  // 登録者一覧
+  if(!members.length){ $("members").innerHTML = '<p class="note">まだ登録がありません。</p>'; return; }
+  rows = members.map((m,idx)=>`<tr>
+      <td>${esc(m.name)}</td><td>${esc(dispShort(m.inst))}</td>
+      <td>${m.songs.map(id=>{
+        const si = (m.songInst||{})[id];
+        return `<span class="tag">${id}${si ? "：" + esc(dispShort(si)) : ""}</span>`;
+      }).join("")}</td>
+      <td style="white-space:nowrap"><button class="sub edt" data-i="${idx}">編集</button> <button class="del" data-i="${idx}">削除</button></td></tr>`).join("");
+  $("members").innerHTML = `<table><thead><tr><th>名前</th><th>楽器</th><th>参加曲</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+$("members").addEventListener("click", async e=>{
+  const ed = e.target.closest(".edt");
+  if(ed){ const m = members[Number(ed.dataset.i)]; if(m) loadMember(m); return; }
+  const b = e.target.closest(".del"); if(!b) return;
+  const m = members[Number(b.dataset.i)];
+  if(!m || !confirm(`${m.name} さんの登録を削除しますか？`)) return;
+  try {
+    applyState(await apiDelete(m.name));
+    render(); setMsg(`${m.name} さんの登録を削除しました。`, true);
+  } catch(err){ setMsg("削除できませんでした：" + err.message); }
+});
+
+$("csv").onclick = () => {
+  const q = s => `"${String(s).replace(/"/g,'""')}"`;
+  const lines = [["名前","楽器",...SONGS.map(s=>s.id),"追加楽器の区分"].map(q).join(",")];
+  members.forEach(m=>lines.push([q(m.name), q(dispInst(m.inst)), ...SONGS.map(s=>q(m.songs.includes(s.id) ? dispInst(instOf(m,s.id)) : "")), q(STD.has(m.inst) ? "" : dispGrp(customMap()[m.inst]||""))].join(",")));
+  const blob = new Blob(["\uFEFF"+lines.join("\n")], {type:"text/csv"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "members.csv"; a.click();
+};
+// 全員のデータを共有しているときは、一括削除ボタンを出さない（誤操作防止）
+if(API_URL) $("reset").style.display = "none";
+else $("reset").onclick = () => { if(confirm("全ての登録データを削除します。よろしいですか？")){ members=[]; overrides={}; order={groups:[],insts:[]}; aliases={insts:{},groups:{}}; storeLocal(); render(); } };
+
+(async function init(){
+  render();
+  setMsg(API_URL ? "登録データを読み込んでいます…" : "お試しモードです。データはこのブラウザ内にだけ保存されます。", true);
+  try {
+    applyState(await apiList());
+    render(); refreshBtn();
+    setMsg(API_URL ? "" : "お試しモードです。データはこのブラウザ内にだけ保存されます。", true);
+  } catch(e){
+    setMsg("登録データを読み込めませんでした：" + e.message);
+  }
+})();
+</script>
+</body>
+</html>
