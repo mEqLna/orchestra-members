@@ -22,6 +22,7 @@
   .songs label { display:flex; gap:8px; align-items:flex-start; padding:8px 10px; cursor:pointer; }
   .si-wrap { display:flex; gap:8px; align-items:center; padding:0 10px 8px 32px; flex-wrap:wrap; }
   .si-wrap select { flex:1 1 220px; width:auto; padding:6px 8px; font-size:.9rem; }
+  .si-wrap input[type=text] { flex:1 1 160px; width:auto; padding:6px 8px; font-size:.9rem; }
   .songs input { margin-top:5px; }
   button { font-size:1rem; padding:10px 18px; border:0; border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; }
   button.sub { background:#eee; color:#333; border:1px solid #ccc; }
@@ -535,18 +536,25 @@ function buildSongRows(){
   const prev = {};
   document.querySelectorAll("#songs .si").forEach(x=>{ prev[x.dataset.id] = x.value; });
   const checked = new Set([...document.querySelectorAll("#songs input:checked")].map(c=>c.value));
-  const opts = allInstruments().map(n=>`<option value="${esc(n)}">${esc(dispShort(n))}</option>`).join("");
+  const opts = allInstruments().map(n=>`<option value="${esc(n)}">${esc(dispShort(n))}</option>`).join("") +
+    `<option value="${OTHER}">＋ 一覧にない楽器を追加する</option>`;
   $("songs").innerHTML = SONGS.map(s =>
     `<div class="songrow">` +
       `<label><input type="checkbox" value="${s.id}"${checked.has(s.id)?" checked":""}>` +
       `<span><b>${s.id}</b> ${esc(s.title)}</span></label>` +
       `<div class="si-wrap" data-for="${s.id}"><span class="note">担当楽器</span>` +
-      `<select class="si" data-id="${s.id}"><option value="">主な楽器と同じ</option>${opts}</select></div>` +
+      `<select class="si" data-id="${s.id}"><option value="">主な楽器と同じ</option>${opts}</select>` +
+      `<input type="text" class="si-other" data-id="${s.id}" maxlength="30" placeholder="追加する楽器名" style="display:none" autocomplete="off"></div>` +
     `</div>`).join("");
   document.querySelectorAll("#songs .si").forEach(x=>{
     if(prev[x.dataset.id] !== undefined) x.value = prev[x.dataset.id];
+    toggleSiOther(x);
   });
   syncSongRows();
+}
+function toggleSiOther(sel){
+  const inp = document.querySelector(`.si-other[data-id="${sel.dataset.id}"]`);
+  if(inp) inp.style.display = sel.value===OTHER ? "inline-block" : "none";
 }
 function syncSongRows(){
   document.querySelectorAll("#songs .songrow").forEach(row=>{
@@ -554,7 +562,10 @@ function syncSongRows(){
     row.querySelector(".si-wrap").style.display = c.checked ? "flex" : "none";
   });
 }
-$("songs").addEventListener("change", e => { if(e.target.type==="checkbox") syncSongRows(); });
+$("songs").addEventListener("change", e => {
+  if(e.target.type==="checkbox") syncSongRows();
+  if(e.target.classList.contains("si")) toggleSiOther(e.target);
+});
 
 function setMsg(t, ok){ const m=$("msg"); m.textContent=t; m.className="msg"+(ok?" ok":""); }
 function refreshBtn(){
@@ -565,7 +576,8 @@ function clearForm(){
   $("name").value=""; $("inst").value=""; $("otherInst").value=""; $("otherGrp").value=OTHER_GROUP; $("newGrp").value="";
   toggleOther();
   document.querySelectorAll("#songs input[type=checkbox]").forEach(c=>c.checked=false);
-  document.querySelectorAll("#songs .si").forEach(x=>{ x.value=""; });
+  document.querySelectorAll("#songs .si").forEach(x=>{ x.value=""; toggleSiOther(x); });
+  document.querySelectorAll("#songs .si-other").forEach(x=>{ x.value=""; });
   syncSongRows();
   refreshBtn();
 }
@@ -580,6 +592,7 @@ function loadMember(m){
   document.querySelectorAll("#songs .si").forEach(x=>{
     const v = (m.songInst || {})[x.dataset.id] || "";
     x.value = v; if(x.value !== v) x.value = "";
+    toggleSiOther(x);
   });
   syncSongRows();
   refreshBtn();
@@ -616,13 +629,20 @@ $("save").onclick = async () => {
     grp = "";
   }
   if(!songs.length){ setMsg("参加曲を1曲以上選んでください。"); return; }
-  // 主な楽器と違う曲だけ、担当楽器を記録する
+  // 主な楽器と違う曲だけ、担当楽器を記録する（一覧にない楽器を追加した場合はここで名前を確定する）
   const songInst = {};
-  songs.forEach(id=>{
+  for(const id of songs){
     const sel = document.querySelector(`#songs .si[data-id="${id}"]`);
-    const v = sel ? sel.value : "";
+    let v = sel ? sel.value : "";
+    if(v === OTHER){
+      const otherInp = document.querySelector(`.si-other[data-id="${id}"]`);
+      const raw = normInst(otherInp ? otherInp.value : "");
+      if(!raw){ setMsg(`${id} の担当楽器（追加する楽器名）を入力してください。`); return; }
+      if(raw.length>30){ setMsg("楽器名は30文字以内で入力してください。"); return; }
+      v = matchKnown(raw) || raw;
+    }
     if(v && v !== inst) songInst[id] = v;
-  });
+  }
   const existed = members.some(m=>m.name===name);
   busy = true; $("save").disabled = true; setMsg("保存しています…", true);
   try {
