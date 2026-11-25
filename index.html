@@ -29,7 +29,7 @@
   .actions { display:flex; gap:8px; flex-wrap:wrap; }
   .msg { color:#b33; min-height:1.4em; margin:6px 0 0; font-size:.9rem; }
   .ok { color:#287a3e; }
-  .scroll { overflow-x:auto; }
+  .scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   table { border-collapse:collapse; width:100%; font-size:.9rem; }
   th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
   th { background:#f0ede4; white-space:nowrap; }
@@ -42,6 +42,30 @@
   tr.kid td:first-child::before { content:"└ "; color:#aaa; }
   .note { color:var(--sub); font-size:.85rem; }
   .tag { display:inline-block; background:#eef; border-radius:4px; padding:0 6px; margin:1px 2px 1px 0; font-size:.8rem; }
+
+  /* スマホ向け：列数の多い表（曲×楽器・登録者一覧）は項目名を折り返さず横スクロールにする */
+  #matrix table, #members table { width:max-content; min-width:100%; }
+  #matrix th, #matrix td { white-space:nowrap; }
+  #matrix th:first-child, #matrix td:first-child,
+  #members th:first-child, #members td:first-child,
+  #members th:nth-child(2), #members td:nth-child(2) { white-space:nowrap; }
+  #matrix th:first-child, #matrix td:first-child,
+  #members th:first-child, #members td:first-child {
+    position:sticky; left:0; box-shadow:1px 0 0 var(--line);
+  }
+  #matrix td:first-child, #members td:first-child { background:var(--card); }
+  #matrix tr.grp td:first-child { background:#f7f5ee; }
+  #matrix tr.total td:first-child { background:#faf8f2; }
+  .scroll-hint { display:none; color:var(--sub); font-size:.78rem; margin:-6px 0 8px; }
+
+  @media (max-width:680px){
+    .scroll-hint { display:block; }
+    .wrap { padding:12px; }
+    .card { padding:14px; }
+    h1 { font-size:1.2rem; }
+    table { font-size:.82rem; }
+    th, td { padding:5px 6px; }
+  }
 </style>
 </head>
 <body>
@@ -95,6 +119,7 @@
 
   <div class="card">
     <h2>曲 × 楽器 内訳（曲ごとの担当楽器）</h2>
+    <p class="scroll-hint">← 左右にスワイプすると全ての曲が見られます →</p>
     <div class="scroll" id="matrix"></div>
   </div>
 
@@ -148,6 +173,7 @@
 
   <div class="card">
     <h2>登録者一覧（<span id="count">0</span>名）</h2>
+    <p class="scroll-hint">← 左右にスワイプすると参加曲・編集ボタンが見られます →</p>
     <div class="scroll" id="members"></div>
     <div class="actions" style="margin-top:12px">
       <button class="sub" id="csv">CSVで保存</button>
